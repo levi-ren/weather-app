@@ -37,7 +37,7 @@ const Current = ({ currentWeather, time, dateBuilder }) => {
         <img
           alt="icon"
           className="icon"
-          src={`http://openweathermap.org/img/wn/${weather[0].icon}.png`}
+          src={`https://openweathermap.org/img/wn/${weather[0].icon}.png`}
         />
       </div>
 
