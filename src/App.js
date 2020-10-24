@@ -1,51 +1,39 @@
 import React, { useCallback, useEffect, useState } from "react";
 import "./App.css";
-import countries from "./helpers/country-codes.json";
 import { icons } from "./helpers/icons";
 import { WiNa } from "react-icons/wi";
-
-const BASE_API = "https://inuendo.herokuapp.com/api/v1/weather/";
+import Current from "./components/Current";
+import Forecast from "./components/Forecast";
 
 function App() {
   const [query, setQuery] = useState("");
   const [weatherForecast, setWeatherForecast] = useState("");
   const [currentWeather, setCurrentWeather] = useState("");
-  const [weatherLoading, setWeatherLoading] = useState(false);
+  const [weatherLoading, setWeatherLoading] = useState(true);
   const [time, setTime] = useState("");
+  const [toggle, setToggle] = useState(false);
 
   const [weather, setweather] = useState("");
 
-  useEffect(() => {
+  const getWeather = (city) => {
     setWeatherLoading(true);
-    fetch(`${BASE_API}new york`)
+    fetch(`${process.env.REACT_APP_BASE_API}${city ? city : "new york"}`)
       .then((res) => res.json())
       .then((result) => {
-        console.log(result);
-        setTimeout(() => {}, 1000);
         const { current, daily } = result;
         setCurrentWeather(current);
-        daily.splice(4, 3);
-        setWeatherForecast(daily);
+        setWeatherForecast(daily.slice(0, 6));
         setweather(result);
-        setWeatherLoading(false);
+        setQuery("");
+        setTimeout(() => setWeatherLoading(false), 2000);
       });
-  }, []);
+  };
+
+  useEffect(getWeather, []);
 
   const search = (evt) => {
     if (evt.key === "Enter") {
-      setWeatherLoading(true);
-      fetch(`${BASE_API}${query}`)
-        .then((res) => res.json())
-        .then((result) => {
-          setQuery("");
-          console.log(result);
-          const { current, daily } = result;
-          setCurrentWeather(current);
-          daily.splice(4, 3);
-          setWeatherForecast(daily);
-          setweather(result);
-          setWeatherLoading(false);
-        });
+      getWeather(query);
     }
   };
 
@@ -53,21 +41,19 @@ function App() {
     const date = new Date().toLocaleString("en-US", {
       timeZone: weather.timezone,
     });
-    const newDate = new Date(date);
-    return {
-      hrs:
-        newDate.getHours() > 12 ? newDate.getHours() - 12 : newDate.getHours(),
-      min: newDate.getMinutes(),
-      sec: newDate.getSeconds(),
-      ampm: newDate.getHours() > 12 ? "PM" : "AM",
-    };
+    const [now, meridiem] = new Date(date).toLocaleTimeString().split(" ");
+
+    setTime({ now, meridiem });
   }, [weather.timezone]);
 
   useEffect(() => {
-    setTime(timeBuilder);
-  }, [timeBuilder]);
+    if (weather) {
+      const timeout = setInterval(() => timeBuilder(), 1000);
+      return () => clearInterval(timeout);
+    }
+  }, [weather, timeBuilder]);
 
-  const dateBuilder = (d, abrv = false) => {
+  const dateBuilder = useCallback((d, abrv = false) => {
     let months = [
       "January",
       "February",
@@ -86,31 +72,18 @@ function App() {
     return !abrv
       ? `${days[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
       : `${d.getDate()} ${days[d.getDay()]} `;
-  };
+  }, []);
 
-  useEffect(() => {
-    const timeout = setInterval(() => setTime(timeBuilder), 1000);
-    return () => clearInterval(timeout);
-  }, [weather, timeBuilder]);
-
-  const getCountry = (code) => {
-    if (countries.hasOwnProperty(code)) {
-      return countries[code];
-    } else {
-      return code;
-    }
-  };
-
-  const getIcon = (id, ampm) => {
+  const iconBuilder = useCallback((id, ampm) => {
     if (icons.hasOwnProperty(id)) {
       return icons[id][ampm];
     } else {
       return <WiNa />;
     }
-  };
+  }, []);
 
   return (
-    <div className={`app ${time.ampm === "PM" ? "warm" : ""}`}>
+    <div className={`app ${time.meridiem === "PM" ? "pm" : ""}`}>
       <main>
         <div className="search-box">
           <input
@@ -123,41 +96,21 @@ function App() {
           ></input>
         </div>
 
-        <div className={`details ${weatherLoading ? "loading" : ""}`}>
+        <div
+          className={`details ${weatherLoading ? "loading" : ""}`}
+          onClick={() => setToggle(!toggle)}
+        >
           {weatherLoading ? (
             <span className="loader"></span>
           ) : (
             <>
-              <div className="location">
-                {currentWeather &&
-                  `${currentWeather.name},
-            ${getCountry(currentWeather.sys.country)}`}
-              </div>
-
-              <div id="time-icon">
-                <div className="time">
-                  {`${time.hrs}:${time.min}:${time.sec} `}
-                  <span>{time.ampm}</span>
-                </div>
-                {currentWeather && (
-                  <img
-                    alt="icon"
-                    className="icon"
-                    src={`http://openweathermap.org/img/wn/${currentWeather.weather[0].icon}.png`}
-                  />
-                )}
-              </div>
-
-              <div id="date-temp">
-                {/* FIX THIS!!! */}
-                <div className="date">{dateBuilder(new Date())}</div>
-                {/* FIX THIS!!! */}
-                <div className="temp">
-                  {currentWeather &&
-                    `${currentWeather.weather[0].main} ${currentWeather.main.temp}`}
-                  &deg;c
-                </div>
-              </div>
+              {weather && (
+                <Current
+                  currentWeather={currentWeather}
+                  time={time}
+                  dateBuilder={dateBuilder}
+                />
+              )}
             </>
           )}
         </div>
@@ -169,22 +122,19 @@ function App() {
             <span className="loader"></span>
           ) : (
             <>
-              {weatherForecast &&
+              {weather &&
                 weatherForecast.map((values, index) => {
+                  const { dt, temp, weather } = values;
                   return (
-                    <div key={index} className="forecasts">
-                      <div className="forecast-date">
-                        {dateBuilder(new Date(values.dt * 1000), true)}
-                      </div>
-                      <div className="forecast-icon">
-                        {getIcon(values.weather[0].id, time.ampm)}
-                      </div>
-                      <div className="forecast-details">
-                        <span id="temp">{values.temp.max}&deg;c</span>
-                        <span id="desc">{values.weather[0].description}</span>
-                      </div>
-                      <div className="forecast-infos"></div>
-                    </div>
+                    <Forecast
+                      dt={dt}
+                      meridiem={time.meridiem}
+                      temp={temp}
+                      weather={weather}
+                      dateBuilder={dateBuilder}
+                      iconBuilder={iconBuilder}
+                      key={index}
+                    />
                   );
                 })}
             </>
