@@ -5,6 +5,8 @@ import { WiNa } from "react-icons/wi";
 import Current from "./components/Current";
 import Forecast from "./components/Forecast";
 
+const BASE_API = "https://inuendo.herokuapp.com/api/v1/weather/";
+
 function App() {
   const [query, setQuery] = useState("");
   const [weatherForecast, setWeatherForecast] = useState("");
@@ -17,7 +19,7 @@ function App() {
 
   const getWeather = (city) => {
     setWeatherLoading(true);
-    fetch(`${process.env.REACT_APP_BASE_API}${city ? city : "new york"}`)
+    fetch(`${BASE_API}${city ? city : "new york"}`)
       .then((res) => res.json())
       .then((result) => {
         const { current, daily } = result;
@@ -25,6 +27,7 @@ function App() {
         setWeatherForecast(daily.slice(0, 6));
         setweather(result);
         setQuery("");
+        console.log(result);
         setTimeout(() => setWeatherLoading(false), 2000);
       });
   };
